@@ -1,3 +1,5 @@
+HTML
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -259,7 +261,7 @@ document.getElementById(id).classList.remove("active");
 }
 
 function populateDropdowns(){
-const members=db.members.filter(m=>m.active);
+const members=db.members.filter(m=>m.active && !m.deleted);
 const options=members.map(m=>`<option value="${m.id}">${escapeHTML(m.name)} (ID: ${m.id})</option>`).join("");
 document.getElementById("col-member").innerHTML=options;
 document.getElementById("loan-member").innerHTML=options;
@@ -281,7 +283,7 @@ const name=document.getElementById("m-name").value.trim();
 const phone=document.getElementById("m-phone").value.trim();
 if(!name){alert("Please enter a member name.");return;}
 const id=db.members.length?Math.max(...db.members.map(m=>Number(m.id)||0))+1:1;
-db.members.push({id,name,phone,active:true});
+db.members.push({id,name,phone,active:true,deleted:false});
 document.getElementById("m-name").value="";
 document.getElementById("m-phone").value="";
 closeModal("modal-add-member");
@@ -289,9 +291,28 @@ saveDB();
 }
 
 function toggleMember(id){
-const member=db.members.find(m=>m.id===id);
+const member=db.members.find(m=>m.id===id && !m.deleted);
 if(member) member.active=!member.active;
 saveDB();
+}
+
+// Delete from directory while preserving all historical financial records.
+function deleteMember(id){
+const member=db.members.find(m=>m.id===id && !m.deleted);
+if(!member)return;
+
+const confirmed=confirm(
+"Delete "+member.name+" from the member directory?\n\n"+
+"Old collections, loans and repayments will be preserved."
+);
+
+if(!confirmed)return;
+
+member.deleted=true;
+member.active=false;
+saveDB();
+
+alert("Member deleted. Old financial records are preserved.");
 }
 
 function addCollection(){
@@ -301,7 +322,7 @@ const due=Number(document.getElementById("col-due").value||0);
 const paid=Number(document.getElementById("col-paid").value||0);
 const delayed=Number(document.getElementById("col-delayed").value||0);
 
-if(!member_id){alert("Add a member first.");return;}
+if(!member_id){alert("Add an active member first.");return;}
 if(due<0||paid<0||delayed<0){alert("Enter valid amounts.");return;}
 if(!date){alert("Select collection date.");return;}
 
@@ -316,7 +337,7 @@ function addLoan(){
 const member_id=Number(document.getElementById("loan-member").value);
 const principal=Number(document.getElementById("loan-principal").value);
 const date=document.getElementById("loan-date").value;
-if(!member_id){alert("Add a member first.");return;}
+if(!member_id){alert("Add an active member first.");return;}
 if(principal<=0){alert("Enter a valid loan amount.");return;}
 if(!date){alert("Select loan date.");return;}
 
@@ -416,7 +437,8 @@ button.innerText="मराठी";
 }
 
 function render(){
-const active=db.members.filter(m=>m.active).length;
+const visibleMembers=db.members.filter(m=>!m.deleted);
+const active=visibleMembers.filter(m=>m.active).length;
 const collected=db.collections.reduce((s,c)=>s+Number(c.paid||0),0);
 const pending=db.collections.reduce((s,c)=>s+Math.max(Number(c.due||0)-Number(c.paid||0),0),0);
 const fines=db.collections.reduce((s,c)=>s+Number(c.fine||0),0);
@@ -441,14 +463,18 @@ return `<div style="padding:8px 0;border-bottom:1px solid var(--border)">
 </div>`;
 }).join("")||"No recent activity.";
 
-document.getElementById("member-table").innerHTML=db.members.map(m=>`
+// Member directory: archived members are hidden, old records stay intact.
+document.getElementById("member-table").innerHTML=visibleMembers.map(m=>`
 <tr>
 <td>${m.id}</td>
 <td><strong>${escapeHTML(m.name)}</strong></td>
 <td>${escapeHTML(m.phone||"—")}</td>
 <td>${m.active?"Active":"Inactive"}</td>
-<td><button type="button" class="btn btn-muted" onclick="toggleMember(${m.id})">Toggle</button></td>
-</tr>`).join("");
+<td>
+<button type="button" class="btn btn-muted" onclick="toggleMember(${m.id})">Toggle</button>
+<button type="button" class="btn btn-orange" onclick="deleteMember(${m.id})">Delete</button>
+</td>
+</tr>`).join("")||'<tr><td colspan="5">No members found.</td></tr>';
 
 document.getElementById("collection-table").innerHTML=db.collections.map(c=>{
 const m=db.members.find(x=>x.id===c.member_id);
@@ -484,10 +510,11 @@ document.getElementById("report-summary").innerHTML=`
 <p><strong>Estimated Treasury Balance:</strong> <strong>${rupees(balance)}</strong></p>`;
 }
 
-// Make every inline button function accessible in Android WebView.
+// Make inline button functions accessible in Android WebView.
 Object.assign(window,{
 toggleLang,showTab,openModal,closeModal,addMember,toggleMember,
-addCollection,addLoan,addRepayment,resetData,exportBackup,importBackup
+deleteMember,addCollection,addLoan,addRepayment,
+resetData,exportBackup,importBackup
 });
 
 window.addEventListener("error",function(event){
@@ -498,4 +525,4 @@ loadDB();
 render();
 </script>
 </body>
-  </html>
+</html>
