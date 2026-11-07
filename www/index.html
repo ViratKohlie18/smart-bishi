@@ -1,0 +1,501 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Smart Bishi - Group Money Manager</title>
+<style>
+:root {
+  --bg:#f0f4f8;--navy:#12223b;--blue:#1f57b3;
+  --blue-light:#e3edfc;--white:#fff;--text:#1f2937;
+  --muted:#667085;--green:#147853;--orange:#b86414;
+  --red:#ae3333;--border:#d0d7de;--th:#f8fafc;--note:#e2e8f0;
+}
+*{box-sizing:border-box;margin:0;padding:0;font-family:Arial,sans-serif}
+body{background:var(--bg);color:var(--text);padding:16px;max-width:1100px;margin:auto}
+button{touch-action:manipulation;-webkit-tap-highlight-color:transparent;cursor:pointer}
+header{background:var(--navy);color:white;padding:16px;border-radius:12px;display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:16px}
+header h1{font-size:22px}
+header p{font-size:12px;color:#a0aec0}
+.btn{padding:10px 14px;border:0;border-radius:6px;font-weight:bold;font-size:13px}
+.btn-primary{background:#1f57b3;color:white}
+.btn-green{background:#147853;color:white}
+.btn-orange{background:#b86414;color:white}
+.btn-muted{background:var(--blue-light);color:var(--blue)}
+nav{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px;background:var(--white);padding:8px;border-radius:10px;border:1px solid var(--border)}
+nav button{flex:1;min-width:75px;padding:12px;background:none;border:0;font-weight:bold;color:var(--muted);border-radius:6px}
+nav button.active{background:var(--blue-light);color:var(--blue)}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(145px,1fr));gap:12px;margin-bottom:16px}
+.card{background:var(--white);padding:16px;border-radius:12px;border:1px solid var(--border)}
+.label{font-size:12px;color:var(--muted)}
+.value{font-size:20px;font-weight:bold;margin-top:5px}
+.section{display:none}
+.section.active{display:block}
+.scroll{overflow-x:auto}
+table{width:100%;border-collapse:collapse;margin-top:10px;background:var(--white)}
+th,td{text-align:left;padding:12px;border-bottom:1px solid var(--border);font-size:13px;white-space:nowrap}
+th{background:var(--th);color:var(--muted)}
+.modal{display:none;position:fixed;inset:0;background:#0008;justify-content:center;align-items:center;z-index:100;padding:12px}
+.modal.active{display:flex}
+.modal-content{background:var(--white);width:95%;max-width:450px;padding:20px;border-radius:12px;max-height:90vh;overflow:auto}
+.modal-content h3{margin-bottom:12px}
+.modal-content input,.modal-content select{width:100%;padding:12px;margin-bottom:10px;border:1px solid var(--border);border-radius:6px;background:var(--bg);color:var(--text)}
+.actions{display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap}
+.row{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;gap:8px;flex-wrap:wrap}
+.rule-note{font-size:12px;color:var(--muted);margin-bottom:12px;padding:10px;background:var(--note);border-radius:6px}
+</style>
+</head>
+<body>
+
+<header>
+<div>
+<h1 id="app-title">Smart Bishi</h1>
+<p id="app-subtitle">Weekly group money manager</p>
+</div>
+<div style="display:flex;gap:6px;flex-wrap:wrap">
+<button class="btn btn-muted" onclick="toggleLang()">मराठी</button>
+<button class="btn btn-muted" onclick="exportBackup()">Export Backup</button>
+<button class="btn btn-muted" onclick="document.getElementById('backup-file').click()">Import Backup</button>
+<button class="btn btn-muted" onclick="resetData()">Reset</button>
+<input type="file" id="backup-file" accept=".json,application/json" hidden onchange="importBackup(this.files[0])">
+</div>
+</header>
+
+<nav>
+<button class="active" onclick="showTab('dashboard',this)">Dashboard</button>
+<button onclick="showTab('members',this)">Members</button>
+<button onclick="showTab('collections',this)">Collection</button>
+<button onclick="showTab('loans',this)">Loans</button>
+<button onclick="showTab('reports',this)">Reports</button>
+</nav>
+
+<div id="dashboard" class="section active">
+<div class="grid">
+<div class="card"><div class="label">Members</div><div class="value" id="dash-members">0</div></div>
+<div class="card"><div class="label">Total collected</div><div class="value" id="dash-collected">₹0</div></div>
+<div class="card"><div class="label">Pending dues</div><div class="value" id="dash-pending">₹0</div></div>
+<div class="card"><div class="label">Late fines</div><div class="value" id="dash-fines">₹0</div></div>
+<div class="card"><div class="label">Loans given</div><div class="value" id="dash-given">₹0</div></div>
+<div class="card"><div class="label">Est. balance</div><div class="value" id="dash-balance">₹0</div></div>
+</div>
+<div class="actions">
+<button class="btn btn-primary" onclick="openModal('modal-add-member')">+ Add Member</button>
+<button class="btn btn-green" onclick="openModal('modal-collection')">+ Weekly Collection</button>
+<button class="btn btn-orange" onclick="openModal('modal-loan')">+ Give Loan</button>
+</div>
+<div class="card">
+<h3>Recent Activity</h3>
+<div id="recent-list">No recent activity.</div>
+</div>
+</div>
+
+<div id="members" class="section">
+<div class="row">
+<h3>Member Directory</h3>
+<button class="btn btn-primary" onclick="openModal('modal-add-member')">+ Add Member</button>
+</div>
+<div class="scroll">
+<table>
+<thead><tr><th>ID</th><th>Name</th><th>Phone</th><th>Status</th><th>Action</th></tr></thead>
+<tbody id="member-table"></tbody>
+</table>
+</div>
+</div>
+
+<div id="collections" class="section">
+<div class="row">
+<h3>Collection History</h3>
+<button class="btn btn-green" onclick="openModal('modal-collection')">+ Record Collection</button>
+</div>
+<div class="rule-note">Late fine = unpaid amount × 10% × delayed weeks.</div>
+<div class="scroll">
+<table>
+<thead><tr><th>Date</th><th>Member</th><th>Due</th><th>Paid</th><th>Fine</th></tr></thead>
+<tbody id="collection-table"></tbody>
+</table>
+</div>
+</div>
+
+<div id="loans" class="section">
+<div class="row">
+<h3>Loan Management</h3>
+<div>
+<button class="btn btn-orange" onclick="openModal('modal-loan')">+ Give Loan</button>
+<button class="btn btn-green" onclick="openModal('modal-repay')">Receive Repayment</button>
+</div>
+</div>
+<div class="rule-note">Simple interest: 3% per completed week on original principal.</div>
+<div class="scroll">
+<table>
+<thead><tr><th>ID</th><th>Member</th><th>Principal</th><th>Date</th><th>Interest</th><th>Status</th></tr></thead>
+<tbody id="loan-table"></tbody>
+</table>
+</div>
+</div>
+
+<div id="reports" class="section">
+<h3>Financial Reports</h3>
+<div class="card">
+<h4>Summary Statement</h4>
+<div id="report-summary" style="margin-top:10px;line-height:1.8"></div>
+</div>
+</div>
+
+<div id="modal-add-member" class="modal">
+<div class="modal-content">
+<h3>Add Member</h3>
+<input type="text" id="m-name" placeholder="Member Name">
+<input type="text" id="m-phone" placeholder="Phone Number">
+<div class="actions">
+<button class="btn btn-muted" onclick="closeModal('modal-add-member')">Cancel</button>
+<button class="btn btn-primary" onclick="addMember()">Save</button>
+</div>
+</div>
+</div>
+
+<div id="modal-collection" class="modal">
+<div class="modal-content">
+<h3>Record Collection</h3>
+<select id="col-member"></select>
+<input type="date" id="col-date">
+<input type="number" id="col-due" placeholder="Amount Due (₹)">
+<input type="number" id="col-paid" placeholder="Amount Paid (₹)">
+<input type="number" id="col-delayed" placeholder="Delayed Weeks">
+<div class="actions">
+<button class="btn btn-muted" onclick="closeModal('modal-collection')">Cancel</button>
+<button class="btn btn-green" onclick="addCollection()">Save</button>
+</div>
+</div>
+</div>
+
+<div id="modal-loan" class="modal">
+<div class="modal-content">
+<h3>Give Loan</h3>
+<select id="loan-member"></select>
+<input type="number" id="loan-principal" placeholder="Loan Amount (₹)">
+<input type="date" id="loan-date">
+<div class="actions">
+<button class="btn btn-muted" onclick="closeModal('modal-loan')">Cancel</button>
+<button class="btn btn-orange" onclick="addLoan()">Save</button>
+</div>
+</div>
+</div>
+
+<div id="modal-repay" class="modal">
+<div class="modal-content">
+<h3>Receive Repayment</h3>
+<select id="repay-loan"></select>
+<input type="number" id="repay-amount" placeholder="Repayment Amount (₹)">
+<input type="date" id="repay-date">
+<div class="actions">
+<button class="btn btn-muted" onclick="closeModal('modal-repay')">Cancel</button>
+<button class="btn btn-green" onclick="addRepayment()">Save</button>
+</div>
+</div>
+</div>
+
+<script>
+"use strict";
+
+const DEFAULT_DB = {
+members:[
+{id:1,name:"Rahul Sharma",phone:"9876543210",active:true},
+{id:2,name:"Priya Patil",phone:"9123456789",active:true}
+],
+collections:[
+{id:1,member_id:1,date:"2026-11-01",due:1000,paid:1000,fine:0}
+],
+loans:[],
+repayments:[]
+};
+
+let db;
+
+function loadDB(){
+try{
+const saved=localStorage.getItem("smart_bishi_db");
+db=saved?JSON.parse(saved):JSON.parse(JSON.stringify(DEFAULT_DB));
+if(!db || typeof db!=="object") throw new Error("Invalid database");
+["members","collections","loans","repayments"].forEach(k=>{
+if(!Array.isArray(db[k])) db[k]=[];
+});
+}catch(error){
+db=JSON.parse(JSON.stringify(DEFAULT_DB));
+}
+}
+
+function saveDB(){
+try{
+localStorage.setItem("smart_bishi_db",JSON.stringify(db));
+}catch(error){
+alert("Unable to save data. Please export a backup and check device storage.");
+}
+render();
+}
+
+function rupees(value){
+return "₹"+Number(value||0).toLocaleString("en-IN",{minimumFractionDigits:2});
+}
+
+function showTab(id,button){
+document.querySelectorAll(".section").forEach(s=>s.classList.remove("active"));
+document.querySelectorAll("nav button").forEach(b=>b.classList.remove("active"));
+document.getElementById(id).classList.add("active");
+button.classList.add("active");
+}
+
+function openModal(id){
+populateDropdowns();
+const today=new Date().toISOString().split("T")[0];
+["col-date","loan-date","repay-date"].forEach(k=>{
+const el=document.getElementById(k);
+if(el) el.value=today;
+});
+document.getElementById(id).classList.add("active");
+}
+
+function closeModal(id){
+document.getElementById(id).classList.remove("active");
+}
+
+function populateDropdowns(){
+const members=db.members.filter(m=>m.active);
+const options=members.map(m=>`<option value="${m.id}">${escapeHTML(m.name)} (ID: ${m.id})</option>`).join("");
+document.getElementById("col-member").innerHTML=options;
+document.getElementById("loan-member").innerHTML=options;
+
+document.getElementById("repay-loan").innerHTML=db.loans.map(l=>{
+const m=db.members.find(x=>x.id===l.member_id);
+return `<option value="${l.id}">Loan #${l.id} - ${escapeHTML(m?m.name:"Unknown")} (₹${l.principal})</option>`;
+}).join("");
+}
+
+function escapeHTML(value){
+return String(value).replace(/[&<>"']/g,c=>({
+"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"
+}[c]));
+}
+
+function addMember(){
+const name=document.getElementById("m-name").value.trim();
+const phone=document.getElementById("m-phone").value.trim();
+if(!name){alert("Please enter a member name.");return;}
+const id=db.members.length?Math.max(...db.members.map(m=>Number(m.id)||0))+1:1;
+db.members.push({id,name,phone,active:true});
+document.getElementById("m-name").value="";
+document.getElementById("m-phone").value="";
+closeModal("modal-add-member");
+saveDB();
+}
+
+function toggleMember(id){
+const member=db.members.find(m=>m.id===id);
+if(member) member.active=!member.active;
+saveDB();
+}
+
+function addCollection(){
+const member_id=Number(document.getElementById("col-member").value);
+const date=document.getElementById("col-date").value;
+const due=Number(document.getElementById("col-due").value||0);
+const paid=Number(document.getElementById("col-paid").value||0);
+const delayed=Number(document.getElementById("col-delayed").value||0);
+
+if(!member_id){alert("Add a member first.");return;}
+if(due<0||paid<0||delayed<0){alert("Enter valid amounts.");return;}
+if(!date){alert("Select collection date.");return;}
+
+const fine=Math.max(due-paid,0)*0.10*delayed;
+db.collections.push({id:Date.now(),member_id,date,due,paid,fine});
+["col-due","col-paid","col-delayed"].forEach(id=>document.getElementById(id).value="");
+closeModal("modal-collection");
+saveDB();
+}
+
+function addLoan(){
+const member_id=Number(document.getElementById("loan-member").value);
+const principal=Number(document.getElementById("loan-principal").value);
+const date=document.getElementById("loan-date").value;
+if(!member_id){alert("Add a member first.");return;}
+if(principal<=0){alert("Enter a valid loan amount.");return;}
+if(!date){alert("Select loan date.");return;}
+
+db.loans.push({id:Date.now(),member_id,principal,date,rate:3});
+document.getElementById("loan-principal").value="";
+closeModal("modal-loan");
+saveDB();
+}
+
+function addRepayment(){
+const loan_id=Number(document.getElementById("repay-loan").value);
+const amount=Number(document.getElementById("repay-amount").value);
+const date=document.getElementById("repay-date").value;
+if(!loan_id){alert("No loan to repay.");return;}
+if(amount<=0){alert("Enter a valid repayment amount.");return;}
+if(!date){alert("Select repayment date.");return;}
+
+db.repayments.push({id:Date.now(),loan_id,amount,date});
+document.getElementById("repay-amount").value="";
+closeModal("modal-repay");
+saveDB();
+}
+
+function calcLoanInterest(loan){
+const start=new Date(loan.date);
+const days=Math.max(0,Math.floor((new Date()-start)/86400000));
+const weeks=Math.floor(days/7);
+return loan.principal*(loan.rate/100)*weeks;
+}
+
+function exportBackup(){
+try{
+const payload={
+app:"Smart Bishi",
+version:1,
+exportedAt:new Date().toISOString(),
+data:db
+};
+const blob=new Blob([JSON.stringify(payload,null,2)],{type:"application/json"});
+const url=URL.createObjectURL(blob);
+const link=document.createElement("a");
+link.href=url;
+link.download="smart-bishi-backup.json";
+document.body.appendChild(link);
+link.click();
+link.remove();
+setTimeout(()=>URL.revokeObjectURL(url),1500);
+alert("Backup exported successfully.");
+}catch(error){
+alert("Backup export failed: "+error.message);
+}
+}
+
+function importBackup(file){
+if(!file)return;
+const reader=new FileReader();
+reader.onload=function(){
+try{
+const parsed=JSON.parse(reader.result);
+const incoming=parsed.data||parsed;
+if(!incoming||!Array.isArray(incoming.members)||!Array.isArray(incoming.collections)||!Array.isArray(incoming.loans)||!Array.isArray(incoming.repayments)){
+throw new Error("Invalid Smart Bishi backup.");
+}
+if(!confirm("This will replace all current records. Continue?"))return;
+db=incoming;
+saveDB();
+alert("Backup restored successfully.");
+}catch(error){
+alert("Import failed: "+error.message);
+}finally{
+document.getElementById("backup-file").value="";
+}
+};
+reader.onerror=()=>alert("Unable to read backup file.");
+reader.readAsText(file);
+}
+
+function resetData(){
+if(!confirm("Reset all data to initial test state?"))return;
+db=JSON.parse(JSON.stringify(DEFAULT_DB));
+saveDB();
+}
+
+function toggleLang(){
+const title=document.getElementById("app-title");
+const subtitle=document.getElementById("app-subtitle");
+const button=document.querySelector("header button");
+if(title.innerText==="Smart Bishi"){
+title.innerText="स्मार्ट भिशी";
+subtitle.innerText="साप्ताहिक भिशी व्यवस्थापन";
+button.innerText="English";
+}else{
+title.innerText="Smart Bishi";
+subtitle.innerText="Weekly group money manager";
+button.innerText="मराठी";
+}
+}
+
+function render(){
+const active=db.members.filter(m=>m.active).length;
+const collected=db.collections.reduce((s,c)=>s+Number(c.paid||0),0);
+const pending=db.collections.reduce((s,c)=>s+Math.max(Number(c.due||0)-Number(c.paid||0),0),0);
+const fines=db.collections.reduce((s,c)=>s+Number(c.fine||0),0);
+const loans=db.loans.reduce((s,l)=>s+Number(l.principal||0),0);
+const repaid=db.repayments.reduce((s,r)=>s+Number(r.amount||0),0);
+const balance=collected+fines+repaid-loans;
+
+document.getElementById("dash-members").innerText=active;
+document.getElementById("dash-collected").innerText=rupees(collected);
+document.getElementById("dash-pending").innerText=rupees(pending);
+document.getElementById("dash-fines").innerText=rupees(fines);
+document.getElementById("dash-given").innerText=rupees(loans);
+document.getElementById("dash-balance").innerText=rupees(balance);
+
+document.getElementById("recent-list").innerHTML=[...db.collections]
+.sort((a,b)=>Number(b.id)-Number(a.id))
+.slice(0,5).map(c=>{
+const m=db.members.find(x=>x.id===c.member_id);
+return `<div style="padding:8px 0;border-bottom:1px solid var(--border)">
+<strong>${escapeHTML(c.date)}</strong> • ${escapeHTML(m?m.name:"Unknown")}
+• Paid: ${rupees(c.paid)} • Fine: ${rupees(c.fine)}
+</div>`;
+}).join("")||"No recent activity.";
+
+document.getElementById("member-table").innerHTML=db.members.map(m=>`
+<tr>
+<td>${m.id}</td>
+<td><strong>${escapeHTML(m.name)}</strong></td>
+<td>${escapeHTML(m.phone||"—")}</td>
+<td>${m.active?"Active":"Inactive"}</td>
+<td><button type="button" class="btn btn-muted" onclick="toggleMember(${m.id})">Toggle</button></td>
+</tr>`).join("");
+
+document.getElementById("collection-table").innerHTML=db.collections.map(c=>{
+const m=db.members.find(x=>x.id===c.member_id);
+return `<tr>
+<td>${escapeHTML(c.date)}</td>
+<td>${escapeHTML(m?m.name:"Unknown")}</td>
+<td>${rupees(c.due)}</td>
+<td>${rupees(c.paid)}</td>
+<td>${rupees(c.fine)}</td>
+</tr>`;
+}).join("");
+
+document.getElementById("loan-table").innerHTML=db.loans.map(l=>{
+const m=db.members.find(x=>x.id===l.member_id);
+const interest=calcLoanInterest(l);
+const repaidAmount=db.repayments.filter(r=>r.loan_id===l.id).reduce((s,r)=>s+Number(r.amount||0),0);
+const remaining=l.principal+interest-repaidAmount;
+return `<tr>
+<td>#${l.id}</td>
+<td>${escapeHTML(m?m.name:"Unknown")}</td>
+<td>${rupees(l.principal)}</td>
+<td>${escapeHTML(l.date)}</td>
+<td>${rupees(interest)}</td>
+<td>${remaining<=0?"Closed":"Open ("+rupees(remaining)+" left)"}</td>
+</tr>`;
+}).join("");
+
+document.getElementById("report-summary").innerHTML=`
+<p><strong>Total Active Members:</strong> ${active}</p>
+<p><strong>Total Cash Collected:</strong> ${rupees(collected)}</p>
+<p><strong>Total Late Fines:</strong> ${rupees(fines)}</p>
+<p><strong>Outstanding Loan Advances:</strong> ${rupees(loans-repaid)}</p>
+<p><strong>Estimated Treasury Balance:</strong> <strong>${rupees(balance)}</strong></p>`;
+}
+
+// Make every inline button function accessible in Android WebView.
+Object.assign(window,{
+toggleLang,showTab,openModal,closeModal,addMember,toggleMember,
+addCollection,addLoan,addRepayment,resetData,exportBackup,importBackup
+});
+
+window.addEventListener("error",function(event){
+alert("Smart Bishi error: "+(event.message||"Unknown error"));
+});
+
+loadDB();
+render();
+</script>
+</body>
+  </html>
